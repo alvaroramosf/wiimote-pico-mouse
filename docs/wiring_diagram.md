@@ -64,15 +64,15 @@ flowchart LR
 
 Standard **920 nm – 940 nm** IR LEDs (such as Vishay TSAL6200, TSAL6400, or generic 5 mm IR emitters) have a typical forward voltage of:
 
-```math
+$$
 V_F \approx 1.35\text{ V} - 1.45\text{ V}\quad (\text{using } V_F = 1.4\text{ V})
-```
+$$
 
 With **1 LED per branch** powered from `VBUS = 5.0 V` and an NPN saturation drop $V_{CE,\text{sat}} \approx 0.2\text{ V}$:
 
-```math
+$$
 V_{\text{resistor}} = 5.0\text{ V} - 1.4\text{ V} - 0.2\text{ V} = 3.4\text{ V}
-```
+$$
 
 ### Choosing $R_1 \dots R_4$ (one per LED)
 
@@ -89,9 +89,9 @@ V_{\text{resistor}} = 5.0\text{ V} - 1.4\text{ V} - 0.2\text{ V} = 3.4\text{ V}
 
 With `GP15` HIGH ($V_{\text{GPIO}} = 3.3\text{ V}$) and $V_{BE,\text{sat}} \approx 0.7\text{ V}$:
 
-```math
+$$
 I_B = \frac{3.3\text{ V} - 0.7\text{ V}}{470\text{ }\Omega} = 5.5\text{ mA}
-```
+$$
 
 - **GPIO safety:** `5.5 mA` is safely below the RP2350/RP2040 nominal per-pin limit (`12 mA`).
 - **Hard saturation:** For $I_C = 200\text{ mA}$, forced gain is $\beta_{\text{forced}} = \frac{200}{5.5} \approx 36$, ensuring clean saturation in a `2N2222A` or `BC337-25/40`. For a MOSFET, `Rb = 470 Ω` (optionally with a `10 kΩ` pull-down to `GND`) also protects the GPIO pin.

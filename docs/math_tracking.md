@@ -8,23 +8,23 @@ This document details the geometric pipeline implemented in [`src/diamond_tracke
 
 The PixArt IR camera outputs up to 4 valid blobs on a $1024 \times 768$ grid with optical center at $(512, 384)$. Raw coordinates are centered and oriented to match screen axes ($+u$ right, $+v$ down):
 
-```math
+$$
 u = 512 - x_{\text{raw}}, \qquad v = y_{\text{raw}} - 384
-```
+$$
 
 Thus, the camera's optical axis (where the Wiimote is aimed) always sits at the origin $(u, v) = (0, 0)$.
 
 The 10-bit ADXL330 accelerometer (zero-centered at `512` in report `0x33`) provides the gravity vector $(a_x, a_y, a_z)$, from which controller roll is computed:
 
-```math
+$$
 \theta_{\text{roll}} = \mathrm{atan2}(a_x, a_z)
-```
+$$
 
 To rotate a camera vector $\vec{p} = (u, v)$ back into the upright TV plane, we apply:
 
-```math
+$$
 R(\theta_{\text{roll}}) = \begin{bmatrix} \cos\theta_{\text{roll}} & -\sin\theta_{\text{roll}} \\ \sin\theta_{\text{roll}} & \cos\theta_{\text{roll}} \end{bmatrix}
-```
+$$
 
 ---
 
@@ -49,19 +49,19 @@ When all 4 diamond vertices are visible:
 
    Each correspondence yields two linear equations:
 
-   ```math
-   u_k h_0 + v_k h_1 + h_2 - X_k u_k h_6 - X_k v_k h_7 = X_k
-   ```
+$$
+u_k h_0 + v_k h_1 + h_2 - X_k u_k h_6 - X_k v_k h_7 = X_k
+$$
 
-   ```math
-   u_k h_3 + v_k h_4 + h_5 - Y_k u_k h_6 - Y_k v_k h_7 = Y_k
-   ```
+$$
+u_k h_3 + v_k h_4 + h_5 - Y_k u_k h_6 - Y_k v_k h_7 = Y_k
+$$
 
    The $8 \times 8$ system is solved in double precision using Gaussian elimination with partial pivoting (after coordinate normalization for numerical stability). Evaluating $H$ at the optical center $(u, v) = (0, 0)$ yields directly:
 
-   ```math
-   X_{\text{raw}} = \frac{h_2}{1} = h_2, \qquad Y_{\text{raw}} = \frac{h_5}{1} = h_5
-   ```
+$$
+X_{\text{raw}} = \frac{h_2}{1} = h_2, \qquad Y_{\text{raw}} = \frac{h_5}{1} = h_5
+$$
 
 3. **Live Geometry State Update:**
    Every 4-LED frame updates:
@@ -77,21 +77,21 @@ When 1 LED exits the camera FOV (or is occluded), 3 blobs remain. The tracker ev
 
 - **Case A (`Top` or `Bottom` missing):** The horizontal diagonal $\vec{d} _ H = P_R - P_L$ is complete. Estimating $\vec{d} _ {V,\text{approx}} = (-d _ {H,v}, d _ {H,u}) / \rho$, the perspective-corrected vertical midpoint is:
 
-  ```math
-  M_V = M_H + \alpha_H \vec{d}_H + \alpha_V \vec{d}_{V,\text{approx}}
-  ```
+$$
+M_V = M_H + \alpha_H \vec{d}_H + \alpha_V \vec{d}_{V,\text{approx}}
+$$
 
   The missing vertex is reconstructed by reflection across $M_V$:
 
-  ```math
-  P_{\text{missing}} = 2 M_V - P_{\text{opposite}}
-  ```
+$$
+P_{\text{missing}} = 2 M_V - P_{\text{opposite}}
+$$
 
 - **Case B (`Left` or `Right` missing):** Symmetrically, from $\vec{d} _ V = P_B - P_T$ and $\vec{d} _ {H,\text{approx}} = (d _ {V,v}, -d _ {V,u}) \cdot \rho$:
 
-  ```math
-  M_H = M_V - \alpha_H \vec{d}_{H,\text{approx}} - \alpha_V \vec{d}_V, \qquad P_{\text{missing}} = 2 M_H - P_{\text{opposite}}
-  ```
+$$
+M_H = M_V - \alpha_H \vec{d}_{H,\text{approx}} - \alpha_V \vec{d}_V, \qquad P_{\text{missing}} = 2 M_H - P_{\text{opposite}}
+$$
 
 The winning candidate minimizes translation-invariant pairwise edge error against the roll-updated previous frame, spatial continuity of the 3 visible dots, and prefers reconstructions outside the sensor rectangle. The 3 real + 1 virtual vertices are fed into the exact same 2D homography, preventing cursor jumps.
 
@@ -105,13 +105,13 @@ On large TVs or at short distances, aiming into a corner can leave only 2 adjace
 2. All $4 \times 3 = 12$ ordered pairs $(a, b)$ are scored by comparing the observed vector $\vec{o} = P_1 - P_0$ against $\vec{e} = \vec{r}_b - \vec{r}_a$ in angle, scale, and temporal proximity to `last_vertices`.
 3. For the winning pair $(a, b)$, the exact 2D similarity transform (uniform scale + rotation + translation) mapping $\vec{r}_a \mapsto P_0$ and $\vec{r}_b \mapsto P_1$ reconstructs all 4 vertices:
 
-   ```math
-   c = \frac{\vec{o} \cdot \vec{e}}{\lVert\vec{e}\rVert^2}, \qquad d = \frac{o_v e_u - o_u e_v}{\lVert\vec{e}\rVert^2}
-   ```
+$$
+c = \frac{\vec{o} \cdot \vec{e}}{\lVert\vec{e}\rVert^2}, \qquad d = \frac{o_v e_u - o_u e_v}{\lVert\vec{e}\rVert^2}
+$$
 
-   ```math
-   V_k = \frac{P_0 + P_1}{2} + \begin{bmatrix} c & -d \\ d & c \end{bmatrix} \left(\vec{r}_k - \frac{\vec{r}_a + \vec{r}_b}{2}\right)
-   ```
+$$
+V_k = \frac{P_0 + P_1}{2} + \begin{bmatrix} c & -d \\ d & c \end{bmatrix} \left(\vec{r}_k - \frac{\vec{r}_a + \vec{r}_b}{2}\right)
+$$
 
 4. Because `ref_vertices` is never overwritten in 2-LED mode, zero geometric drift accumulates even when holding the pointer in a corner indefinitely.
 
@@ -127,13 +127,13 @@ When fewer than 2 IR LEDs are visible, the pointer freezes smoothly at its last 
 
 To compensate for bezel geometry and mounting tolerances, calibration mode (hold `+` and `-` for 3 s) locks the USB cursor to two known screen targets $T_1 = (0.10, 0.10)$ and $T_2 = (0.90, 0.90)$ and records the raw homography outputs $(P_1, P_2)$ when `A` is pressed:
 
-```math
+$$
 s_x = \frac{0.90 - 0.10}{P_{2,x} - P_{1,x}}, \qquad b_x = 0.10 - s_x P_{1,x}
-```
+$$
 
-```math
+$$
 X_{\text{cal}} = \mathrm{clamp}_{[0,1]}(s_x X_{\text{raw}} + b_x)
-```
+$$
 
 (and analogously for $Y$). All coefficients and reference diagonals are stored in Flash protected by a magic header and IEEE 802.3 CRC-32.
 
@@ -145,18 +145,18 @@ To suppress natural hand tremor at $\ge 2.5\text{ m}$ without adding lag to fast
 
 1. Smoothed velocity with fixed cutoff $f_d = 1.0\text{ Hz}$:
 
-   ```math
-   \hat{\dot{x}}_i = \mathrm{LPF}\left(\frac{x_i - \hat{x}_{i-1}}{\Delta t}, \alpha(\Delta t, f_d)\right)
-   ```
+$$
+\hat{\dot{x}}_i = \mathrm{LPF}\left(\frac{x_i - \hat{x}_{i-1}}{\Delta t}, \alpha(\Delta t, f_d)\right)
+$$
 
 2. Adaptive cutoff frequency ($f_{c,\min} = 1.2\text{ Hz}$, $\beta = 2.5$ for normalized $[0,1]$ coordinates):
 
-   ```math
-   f_c = f_{c,\min} + \beta |\hat{\dot{x}}_i|
-   ```
+$$
+f_c = f_{c,\min} + \beta |\hat{\dot{x}}_i|
+$$
 
 3. Filtered output:
 
-   ```math
-   \hat{x}_i = \mathrm{LPF}(x_i, \alpha(\Delta t, f_c)), \qquad \alpha(\Delta t, f) = \frac{2\pi f \Delta t}{1 + 2\pi f \Delta t}
-   ```
+$$
+\hat{x}_i = \mathrm{LPF}(x_i, \alpha(\Delta t, f_c)), \qquad \alpha(\Delta t, f) = \frac{2\pi f \Delta t}{1 + 2\pi f \Delta t}
+$$
