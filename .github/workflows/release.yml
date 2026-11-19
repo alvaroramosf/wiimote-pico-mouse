@@ -44,7 +44,7 @@ jobs:
             libstdc++-arm-none-eabi-newlib build-essential python3
       - name: Fetch pico-sdk
         run: |
-          git clone --depth 1 --branch 2.1.1 https://github.com/raspberrypi/pico-sdk.git "$RUNNER_TEMP/pico-sdk"
+          git clone --depth 1 --branch 2.3.1 https://github.com/raspberrypi/pico-sdk.git "$RUNNER_TEMP/pico-sdk"
           git -C "$RUNNER_TEMP/pico-sdk" submodule update --init --depth 1
       - name: Build
         run: |
