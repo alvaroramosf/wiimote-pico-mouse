@@ -14,7 +14,7 @@ Thus, the camera's optical axis (where the Wiimote is aimed) always sits at the 
 
 The 10-bit ADXL330 accelerometer (zero-centered at `512` in report `0x33`) provides the gravity vector $(a_x, a_y, a_z)$, from which controller roll is computed:
 
-$$\theta_{\text{roll}} = \operatorname{atan2}(a_x, a_z)$$
+$$\theta_{\text{roll}} = \mathrm{atan2}(a_x, a_z)$$
 
 To rotate a camera vector $\vec{p} = (u, v)$ back into the upright TV plane, we apply:
 
@@ -106,7 +106,7 @@ When fewer than 2 IR LEDs are visible, the pointer freezes smoothly at its last 
 To compensate for bezel geometry and mounting tolerances, calibration mode (hold `+` and `-` for 3 s) locks the USB cursor to two known screen targets $(T_1 = (0.10, 0.10), \; T_2 = (0.90, 0.90))$ and records the raw homography outputs $(P_1, P_2)$ when `A` is pressed:
 
 $$s_x = \frac{0.90 - 0.10}{P_{2,x} - P_{1,x}}, \qquad b_x = 0.10 - s_x P_{1,x}$$
-$$X_{\text{cal}} = \operatorname{clamp}_{[0,1]}(s_x X_{\text{raw}} + b_x)$$
+$$X_{\text{cal}} = \mathrm{clamp}_{[0,1]}(s_x X_{\text{raw}} + b_x)$$
 
 (and analogously for $Y$). All coefficients and reference diagonals are stored in Flash protected by a magic header and IEEE 802.3 CRC-32.
 
@@ -117,8 +117,8 @@ $$X_{\text{cal}} = \operatorname{clamp}_{[0,1]}(s_x X_{\text{raw}} + b_x)$$
 To suppress natural hand tremor at $\ge 2.5\text{ m}$ without adding lag to fast movements, $(X_{\text{cal}}, Y_{\text{cal}})$ is filtered per axis (`src/one_euro_filter.c`):
 
 1. Smoothed velocity with fixed cutoff $f_d = 1.0\text{ Hz}$:
-   $$\hat{\dot{x}}_i = \operatorname{LPF}\left(\frac{x_i - \hat{x}_{i-1}}{\Delta t}, \; \alpha(\Delta t, f_d)\right)$$
+   $$\hat{\dot{x}}_i = \mathrm{LPF}\left(\frac{x_i - \hat{x}_{i-1}}{\Delta t}, \; \alpha(\Delta t, f_d)\right)$$
 2. Adaptive cutoff frequency:
    $$f_c = f_{c,\min} + \beta |\hat{\dot{x}}_i| \qquad (f_{c,\min} = 1.2\text{ Hz}, \; \beta = 2.5\text{ for normalized } [0,1]\text{ coordinates})$$
 3. Filtered output:
-   $$\hat{x}_i = \operatorname{LPF}(x_i, \; \alpha(\Delta t, f_c)), \qquad \alpha(\Delta t, f) = \frac{2\pi f \Delta t}{1 + 2\pi f \Delta t}$$
+   $$\hat{x}_i = \mathrm{LPF}(x_i, \; \alpha(\Delta t, f_c)), \qquad \alpha(\Delta t, f) = \frac{2\pi f \Delta t}{1 + 2\pi f \Delta t}$$
