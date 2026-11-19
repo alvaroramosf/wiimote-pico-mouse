@@ -1,0 +1,30 @@
+# Build directories and CMake artifacts
+build/
+build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+/Makefile
+
+# Pico firmware binaries
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+*.dis
+*.o
+*.d
+*.a
+
+# Host test binaries
+tests/test_runner
+tests/*.o
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+__pycache__/

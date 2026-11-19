@@ -1,0 +1,40 @@
+name: Deploy configurator to GitHub Pages
+
+# One-time setup: repository Settings -> Pages -> Source: "GitHub Actions".
+# The configurator is then served over HTTPS at https://<user>.github.io/<repo>/
+# (WebHID needs a secure context; no local web server required).
+
+on:
+  push:
+    branches: [main]
+    paths: [docs/configurator.html, docs/99-wiimote-pico.rules, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site
+        run: |
+          mkdir site
+          cp docs/configurator.html site/index.html
+          cp docs/99-wiimote-pico.rules site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
