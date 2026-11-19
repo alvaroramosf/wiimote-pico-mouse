@@ -20,7 +20,7 @@ $$
 \theta_{\text{roll}} = \mathrm{atan2}(a_x, a_z)
 $$
 
-To rotate a camera vector $\vec{p} = (u, v)$ back into the upright TV plane, we apply:
+To rotate a camera vector $\mathbf{p} = (u, v)$ back into the upright TV plane, we apply:
 
 $$
 R(\theta_{\text{roll}}) = \begin{bmatrix} \cos\theta_{\text{roll}} & -\sin\theta_{\text{roll}} \\ \sin\theta_{\text{roll}} & \cos\theta_{\text{roll}} \end{bmatrix}
@@ -65,8 +65,8 @@ $$
 
 3. **Live Geometry State Update:**
    Every 4-LED frame updates:
-   - Diagonals $\vec{d}_H = P_R - P_L$, $\vec{d}_V = P_B - P_T$, lengths $L_H = \lVert\vec{d}_H\rVert$, $L_V = \lVert\vec{d}_V\rVert$, and aspect ratio $\rho = L_H / L_V$.
-   - Perspective midpoint offset $\vec{\delta} = M_V - M_H = \alpha_H \vec{d}_H + \alpha_V \vec{d}_V$, where $M_H = \frac{1}{2}(P_L + P_R)$ and $M_V = \frac{1}{2}(P_T + P_B)$.
+   - Diagonals $\mathbf{d} _ H = P_R - P_L$, $\mathbf{d} _ V = P_B - P_T$, lengths $L_H = \lVert\mathbf{d} _ H\rVert$, $L_V = \lVert\mathbf{d} _ V\rVert$, and aspect ratio $\rho = L_H / L_V$.
+   - Perspective midpoint offset $\boldsymbol{\delta} = M_V - M_H = \alpha_H \mathbf{d} _ H + \alpha_V \mathbf{d} _ V$, where $M_H = (P_L + P_R)/2$ and $M_V = (P_T + P_B)/2$.
    - A drift-free reference template `ref_vertices[4]` and `ref_roll`.
 
 ---
@@ -75,22 +75,22 @@ $$
 
 When 1 LED exits the camera FOV (or is occluded), 3 blobs remain. The tracker evaluates all $4 \times 3! = 24$ assignments `(missing_slot, 3-point permutation)`:
 
-- **Case A (`Top` or `Bottom` missing):** The horizontal diagonal $\vec{d} _ H = P_R - P_L$ is complete. Estimating $\vec{d} _ {V,\text{approx}} = (-d _ {H,v}, d _ {H,u}) / \rho$, the perspective-corrected vertical midpoint is:
+- **Case A (`Top` or `Bottom` missing):** The horizontal diagonal $\mathbf{d} _ H = P_R - P_L$ is complete. Estimating $\mathbf{d} _ {V,\text{approx}} = (-d _ {H,v}, d _ {H,u}) / \rho$, the perspective-corrected vertical midpoint is:
 
 $$
-M_V = M_H + \alpha_H \vec{d}_H + \alpha_V \vec{d}_{V,\text{approx}}
+M_V = M_H + \alpha_H \mathbf{d}_H + \alpha_V \mathbf{d}_{V,\text{approx}}
 $$
 
-  The missing vertex is reconstructed by reflection across $M_V$:
+The missing vertex is reconstructed by reflection across $M_V$:
 
 $$
 P_{\text{missing}} = 2 M_V - P_{\text{opposite}}
 $$
 
-- **Case B (`Left` or `Right` missing):** Symmetrically, from $\vec{d} _ V = P_B - P_T$ and $\vec{d} _ {H,\text{approx}} = (d _ {V,v}, -d _ {V,u}) \cdot \rho$:
+- **Case B (`Left` or `Right` missing):** Symmetrically, from $\mathbf{d} _ V = P_B - P_T$ and $\mathbf{d} _ {H,\text{approx}} = (d _ {V,v}, -d _ {V,u}) \cdot \rho$:
 
 $$
-M_H = M_V - \alpha_H \vec{d}_{H,\text{approx}} - \alpha_V \vec{d}_V, \qquad P_{\text{missing}} = 2 M_H - P_{\text{opposite}}
+M_H = M_V - \alpha_H \mathbf{d}_{H,\text{approx}} - \alpha_V \mathbf{d}_V, \qquad P_{\text{missing}} = 2 M_H - P_{\text{opposite}}
 $$
 
 The winning candidate minimizes translation-invariant pairwise edge error against the roll-updated previous frame, spatial continuity of the 3 visible dots, and prefers reconstructions outside the sensor rectangle. The 3 real + 1 virtual vertices are fed into the exact same 2D homography, preventing cursor jumps.
@@ -101,16 +101,16 @@ The winning candidate minimizes translation-invariant pairwise edge error agains
 
 On large TVs or at short distances, aiming into a corner can leave only 2 adjacent LEDs visible (e.g., `Top` + `Right`).
 
-1. The stored `ref_vertices[4]` template (captured during the last 4-LED frame) is rotated to the live accelerometer roll via $\Delta\theta = \theta_{\text{roll}} - \theta_{\text{ref}}$, yielding $\vec{r}_k$.
-2. All $4 \times 3 = 12$ ordered pairs $(a, b)$ are scored by comparing the observed vector $\vec{o} = P_1 - P_0$ against $\vec{e} = \vec{r}_b - \vec{r}_a$ in angle, scale, and temporal proximity to `last_vertices`.
-3. For the winning pair $(a, b)$, the exact 2D similarity transform (uniform scale + rotation + translation) mapping $\vec{r}_a \mapsto P_0$ and $\vec{r}_b \mapsto P_1$ reconstructs all 4 vertices:
+1. The stored `ref_vertices[4]` template (captured during the last 4-LED frame) is rotated to the live accelerometer roll via $\Delta\theta = \theta_{\text{roll}} - \theta_{\text{ref}}$, yielding $\mathbf{r} _ k$.
+2. All $4 \times 3 = 12$ ordered pairs $(a, b)$ are scored by comparing the observed vector $\mathbf{o} = P_1 - P_0$ against $\mathbf{e} = \mathbf{r} _ b - \mathbf{r} _ a$ in angle, scale, and temporal proximity to `last_vertices`.
+3. For the winning pair $(a, b)$, the exact 2D similarity transform (uniform scale + rotation + translation) mapping $\mathbf{r} _ a \mapsto P_0$ and $\mathbf{r} _ b \mapsto P_1$ reconstructs all 4 vertices:
 
 $$
-c = \frac{\vec{o} \cdot \vec{e}}{\lVert\vec{e}\rVert^2}, \qquad d = \frac{o_v e_u - o_u e_v}{\lVert\vec{e}\rVert^2}
+c = \frac{\mathbf{o} \cdot \mathbf{e}}{\lVert\mathbf{e}\rVert^2}, \qquad d = \frac{o_v e_u - o_u e_v}{\lVert\mathbf{e}\rVert^2}
 $$
 
 $$
-V_k = \frac{P_0 + P_1}{2} + \begin{bmatrix} c & -d \\ d & c \end{bmatrix} \left(\vec{r}_k - \frac{\vec{r}_a + \vec{r}_b}{2}\right)
+V_k = \frac{P_0 + P_1}{2} + \begin{bmatrix} c & -d \\ d & c \end{bmatrix} \left(\mathbf{r}_k - \frac{\mathbf{r}_a + \mathbf{r}_b}{2}\right)
 $$
 
 4. Because `ref_vertices` is never overwritten in 2-LED mode, zero geometric drift accumulates even when holding the pointer in a corner indefinitely.
@@ -143,20 +143,20 @@ $$
 
 To suppress natural hand tremor at $\ge 2.5\text{ m}$ without adding lag to fast movements, $(X_{\text{cal}}, Y_{\text{cal}})$ is filtered per axis (`src/one_euro_filter.c`):
 
-1. Smoothed velocity with fixed cutoff $f_d = 1.0\text{ Hz}$:
+1. Smoothed velocity $v_{\text{filt},i}$ with fixed derivative cutoff $f_d = 1.0\text{ Hz}$:
 
 $$
-\hat{\dot{x}}_i = \mathrm{LPF}\left(\frac{x_i - \hat{x}_{i-1}}{\Delta t}, \alpha(\Delta t, f_d)\right)
+v_{\text{filt},i} = \mathrm{LPF}\left(\frac{x_i - x_{\text{filt},i-1}}{\Delta t}, \alpha(\Delta t, f_d)\right)
 $$
 
 2. Adaptive cutoff frequency ($f_{c,\min} = 1.2\text{ Hz}$, $\beta = 2.5$ for normalized $[0,1]$ coordinates):
 
 $$
-f_c = f_{c,\min} + \beta |\hat{\dot{x}}_i|
+f_c = f_{c,\min} + \beta |v_{\text{filt},i}|
 $$
 
-3. Filtered output:
+3. Filtered position output $x_{\text{filt},i}$:
 
 $$
-\hat{x}_i = \mathrm{LPF}(x_i, \alpha(\Delta t, f_c)), \qquad \alpha(\Delta t, f) = \frac{2\pi f \Delta t}{1 + 2\pi f \Delta t}
+x_{\text{filt},i} = \mathrm{LPF}(x_i, \alpha(\Delta t, f_c)), \qquad \alpha(\Delta t, f) = \frac{2\pi f \Delta t}{1 + 2\pi f \Delta t}
 $$
