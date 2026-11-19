@@ -289,3 +289,5 @@ The firmware version lives in [`VERSION`](VERSION) and is printed on the UART at
 ## License
 
 Distributed under the **GNU General Public License v3.0 (GPLv3)**. See [`LICENSE`](LICENSE).
+
+> **Non-commercial use:** the firmware images link against [BTstack](https://github.com/bluekitchen/btstack), whose license only permits personal, non-commercial use (commercial licenses are available from BlueKitchen GmbH). Do not sell devices or ship this firmware in a commercial product without resolving that. Details for all third-party components are in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).

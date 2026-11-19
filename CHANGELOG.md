@@ -23,4 +23,5 @@ First public pre-release. Not yet validated on real hardware.
 - English and Spanish documentation, including per-distro setup and troubleshooting.
 
 ### Notes
+- Firmware binaries link BTstack (non-commercial license) and cyw43-driver (Raspberry Pi hardware only); see `THIRD_PARTY_LICENSES.md`.
 - The USB VID/PID (`cafe:4010`) is a development placeholder, intended only for personal/non-commercial use.

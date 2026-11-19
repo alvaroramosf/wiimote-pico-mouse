@@ -89,3 +89,5 @@ La integración continua (`.github/workflows/ci.yml`) ejecuta los tests con ASan
 ## Licencia
 
 GPLv3. Ver [`LICENSE`](LICENSE).
+
+> **Uso no comercial:** el firmware enlaza con [BTstack](https://github.com/bluekitchen/btstack), cuya licencia solo permite uso personal y no comercial (hay licencias comerciales de BlueKitchen GmbH). No vendas dispositivos ni incluyas este firmware en un producto comercial sin resolverlo. Los detalles de los componentes de terceros están en [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
