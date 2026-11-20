@@ -1,8 +1,28 @@
+[![CI](https://img.shields.io/github/actions/workflow/status/alvaroramosf/wiimote-pico-mouse/ci.yml?branch=main&label=CI)](https://github.com/alvaroramosf/wiimote-pico-mouse/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/alvaroramosf/wiimote-pico-mouse?include_prereleases)](https://github.com/alvaroramosf/wiimote-pico-mouse/releases/latest)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+[![WebHID Configurator](https://img.shields.io/badge/WebHID-Configurator-brightgreen)](https://alvaroramosf.github.io/wiimote-pico-mouse/)
+
 # wiimote-pico-mouse
 
-🇪🇸 [Leer en español](README.es.md)
+Turn an **original Nintendo Wii Remote (`RVL-CNT-01` / `RVL-CNT-01-TR`)** into a USB **lightgun-style absolute pointer, keyboard, and media remote** for your **HTPC / couch PC**. It is an open-source **DolphinBar alternative**: complete C firmware (`pico-sdk`) for the **Raspberry Pi Pico 2 W** (RP2350 + CYW43439; also compatible with **Pico W** RP2040) that connects to the Wiimote over **Bluetooth Classic (BTstack L2CAP HID Host)** and presents a **composite USB HID absolute pointer + keyboard + multimedia control** device.
 
-Complete C firmware (`pico-sdk`) for **Raspberry Pi Pico 2 W** (RP2350 + CYW43439, also compatible with **Pico W** RP2040) that connects an **original Nintendo Wii Remote (`RVL-CNT-01` / `RVL-CNT-01-TR`)** over **Bluetooth Classic (BTstack L2CAP HID Host)** and emulates a **composite USB HID absolute pointer + keyboard + multimedia control** device—100% plug-and-play on **Fedora Linux (Wayland/X11)** with no host drivers or background software required.
+Because it is a standard USB HID device, it is 100% plug-and-play on **Linux (Wayland/X11), Windows, macOS, and SteamOS**, with no host drivers or background software. It has been tested primarily on Fedora Linux.
+
+---
+
+## Quick Start (Pre-built Firmware)
+
+No toolchain needed. You only need the hardware from the [BOM](#bill-of-materials-bom) wired as described in [`docs/wiring_diagram.md`](docs/wiring_diagram.md).
+
+1. Download the `.uf2` for your board from [GitHub Releases](https://github.com/alvaroramosf/wiimote-pico-mouse/releases/latest):
+   - **Pico 2 W:** `wiimote-pico-mouse-<tag>-pico2_w.uf2`
+   - **Pico W:** `wiimote-pico-mouse-<tag>-pico_w.uf2`
+   - *(Optional)* verify it against `SHA256SUMS.txt` from the same release.
+2. Hold the **`BOOTSEL`** button on the Pico while plugging it into USB. It mounts as a drive (`RP2350` or `RPI-RP2`).
+3. Copy the `.uf2` file onto that drive. The Pico reboots automatically and enumerates as **`Wiimote IR Absolute Pointer + Media`**.
+4. Pair the Wiimote: press the red **`SYNC`** button under the battery cover (permanent bonding) or hold **`1 + 2`**. **LED 1** lights up solid once connected, and the IR LEDs switch on.
+5. Calibrate once by holding `+` and `-` for 3 s (see [Usage, Pairing, and Calibration](#usage-pairing-and-calibration)).
 
 ---
 
@@ -34,6 +54,8 @@ Complete C firmware (`pico-sdk`) for **Raspberry Pi Pico 2 W** (RP2350 + CYW4343
 | 1 | **470 Ω** resistor (1/4 W) | Base/gate resistor between `GP15` and the transistor |
 | — | Thin copper wire / AWG 28–30 hookup wire | 4 independent 2-wire pairs (8 wires total) from the board to the TV bezel |
 
+> **Estimated total cost:** approx. 10–12 € (excluding the Wiimote).
+
 See [`docs/wiring_diagram.md`](docs/wiring_diagram.md) for the full schematic and resistor calculations.
 
 ---
@@ -51,41 +73,103 @@ Route an independent 2-wire pair (`+` / `-`) from each LED directly back to the 
 
 ---
 
-## Repository Structure
+## Usage, Pairing, and Calibration
 
-```text
-wiimote-pico-mouse/
-├── CMakeLists.txt
-├── pico_sdk_import.cmake
-├── LICENSE
-├── README.md
-├── docs/
-│   ├── 99-wiimote-pico.rules  # Fedora Linux udev rule for WebHID hidraw access
-│   ├── configurator.html      # Single-file WebHID keymap & 1-Euro tuner UI
-│   ├── wiring_diagram.md      # Circuit schematic, pinout, and resistor math
-│   ├── math_tracking.tex      # Homography, 4->3->2 LED fallback, and 1-Euro filter (LaTeX)
-│   └── math_tracking.pdf      # Compiled PDF of math_tracking.tex
-├── src/
-│   ├── main.c                 # Main 100 Hz loop, calibration, and HID pipeline
-│   ├── config.h               # GPIO pins, 1-Euro tuning, IR sensitivity, keymap schema
-│   ├── btstack_config.h       # BTstack Classic (BR/EDR) configuration
-│   ├── tusb_config.h          # TinyUSB Device HID configuration (2 HID interfaces)
-│   ├── usb_descriptors.c      # Composite HID (ITF 0) + Vendor WebHID Configurator (ITF 1)
-│   ├── usb_hid.c / .h         # Dynamic button mapping, HID queues, WebHID Feature Reports
-│   ├── wiimote_bt.c / .h      # L2CAP HID Host, pairing, PixArt init, 0x33 parser
-│   ├── diamond_tracker.c / .h # 4-LED homography, 3/2-LED recovery, calibration
-│   ├── one_euro_filter.c / .h # Adaptive 1-Euro anti-jitter filter
-│   ├── flash_storage.c / .h   # Internal Flash persistence (v2 + v1 migration) with CRC-32
-│   └── ir_leds.c / .h         # GP15 transistor power control
-└── tests/
-    ├── Makefile
-    ├── host_mocks/            # TinyUSB mock header for Linux host unit tests
-    └── test_suite.c           # Math, 0x33 parser, Flash, and HID unit tests
-```
+### Bluetooth Pairing
+
+- **Permanent bonding (`SYNC`):** Press the red `SYNC` button under the Wiimote battery cover. The Pico 2 W discovers it, completes binary PIN authentication automatically, and stores the link key in Flash. Afterwards, pressing **`A`** (or any button) on the Wiimote reconnects automatically in ~1–2 seconds.
+- **Temporary pairing (`1 + 2`):** Hold `1 + 2` simultaneously while the Wiimote is off.
+
+Once connected and initialized:
+1. Wiimote **LED 1** lights up solid.
+2. **GP15** goes HIGH (`3.3 V`) to power on the **4 IR LEDs** around the TV.
+3. When the Wiimote powers off or disconnects, **GP15** immediately turns the IR LEDs off.
+
+### 2-Point On-Controller Calibration (No PC Software)
+
+1. Hold **`+` and `-` simultaneously for 3 seconds**. LED 1 starts blinking.
+2. The Pico places the USB pointer at the top-left target (**10 %, 10 %**). Aim at the cursor and press **`A`** (at least 2 IR LEDs must be visible).
+3. The Wiimote buzzes briefly and **LED 4** starts blinking. The pointer moves to the bottom-right target (**90 %, 90 %**). Aim and press **`A`**.
+4. Calibration is saved to internal Flash (survives reboots and power loss).
+
+Wiimote feedback during calibration:
+
+| Pattern | Meaning |
+|---|---|
+| LED 1 blinking | Waiting for the top-left sample |
+| Short buzz, then LED 4 blinking | Step 1 accepted, waiting for the bottom-right sample |
+| All LEDs solid + buzz (≈1 s), then LED 1 solid | Calibration saved to Flash |
+| LEDs 1+3 / 2+4 alternating + long buzz (≈1 s) | **Error:** degenerate sample (previous calibration restored) or Flash write failed |
+| LED 1 + very short buzz | Calibration cancelled (hold `+` and `-` for 3 s again while calibrating) |
 
 ---
 
-## Building and Flashing on Linux
+## Default Button & Media Mapping
+
+Defaults are defined in [`src/config.h`](src/config.h) / [`src/flash_storage.c`](src/flash_storage.c) and can be customized live over USB using the WebHID Configurator:
+
+| Wiimote Input | USB HID Action |
+|---|---|
+| **IR Aiming** | Absolute screen pointer (`0..32767` × `0..32767`) |
+| **`B`** (trigger) | Left mouse button |
+| **`A`** | Right mouse button *(confirms point during calibration)* |
+| **D-Pad Up / Down** | Continuous vertical scroll wheel |
+| **D-Pad Left / Right** | Mouse Back / Forward navigation buttons |
+| **`+`** *(short press)* | Volume Increment |
+| **`-`** *(short press)* | Volume Decrement |
+| **`+` and `-`** *(hold 3 s)* | Enter / cancel calibration mode |
+| **`Home`** | Multimedia `Play / Pause` |
+| **`1`** | Middle mouse button |
+| **`2`** | `Super` / Activities Overview on GNOME (`0xE3`) |
+
+---
+
+## WebHID Button & Sensitivity Configurator
+
+No Wi-Fi or host daemon is needed. Interface `1` (`ITF_NUM_HID_CFG`, Vendor Usage Page `0xFF00`, Usage `0x01`, Report ID `4`) lets Chromium-based browsers (Chrome, Chromium, Edge) configure all 11 Wiimote buttons, 1-Euro smoothing (`min_cutoff`, `beta`), and `scroll_interval_ms` over USB and save them to the Pico's internal Flash. Firefox and Safari do not support WebHID.
+
+### 1. Install the `udev` rule (Linux only, one-time setup)
+
+> **Linux only.** This step is **not needed on Windows or macOS**; skip to [step 2](#2-open-the-configurator).
+
+Copy [`docs/99-wiimote-pico.rules`](docs/99-wiimote-pico.rules) so your desktop session can access the Pico's `hidraw` vendor interface without `root`:
+
+```bash
+sudo cp docs/99-wiimote-pico.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+*(If the Pico was already plugged in before adding the rule, unplug and replug its USB cable once.)*
+
+The same commands work on Fedora, Debian/Ubuntu, and Arch (anything using `systemd-udev`). Notes for other setups:
+
+- **No `uaccess` support / minimal desktops:** replace `TAG+="uaccess"` with `GROUP="plugdev"` (Debian/Ubuntu) or `GROUP="input"`, and add your user with `sudo usermod -aG plugdev $USER` (re-login required).
+- **Verify the rule applied:** `ls -l /dev/hidraw*` should show your user (via ACL) or the group with `rw` on the Pico's vendor interface; `udevadm info -a /dev/hidrawN | grep -E 'idVendor|idProduct'` should print `cafe` / `4010`.
+- **Flatpak/Snap browsers:** WebHID access may be sandboxed; use a native Chromium/Chrome package if the device does not appear in the chooser.
+
+### 2. Open the configurator
+
+**Easiest (hosted):** open <https://alvaroramosf.github.io/wiimote-pico-mouse/> in Chromium/Chrome. No local server needed. The page also contains a first-time setup guide with a copy-paste command for the Linux `udev` rule. If you fork the repo, enable Pages for your fork (Settings → Pages → Source: *GitHub Actions*); the [`pages.yml`](.github/workflows/pages.yml) workflow publishes it.
+
+**Local alternative:** serve `docs/configurator.html` yourself (see below).
+
+WebHID requires a secure context (`http://localhost` or `https://`), not `file://`. To run it locally, start Python's built-in HTTP server from the repository root:
+
+```bash
+python3 -m http.server 8000
+```
+
+Then open **`http://localhost:8000/docs/configurator.html`** in **Chromium** or **Google Chrome**:
+
+1. Click **Connect Pico (WebHID)** and select **`Wiimote IR Absolute Pointer + Media`**. On later visits the page reconnects automatically.
+2. Adjust any button binding (Mouse Button, Scroll Wheel, Keyboard Key, or Consumer Media) and/or tune `min_cutoff`, `beta`, and `scroll_interval_ms`.
+3. Optionally load a ready-made layout (*Mouse*, *Presentations*, *Media center*), or **Export / Import JSON** to back up and share profiles.
+4. Click **Save to Pico Flash** to apply the settings immediately and persist them across reboots, or **Reset Defaults (Pico Flash)** to restore factory defaults. The page waits for the Pico's confirmation and reports errors (bad CRC, out-of-range values, or a failed Flash write) instead of assuming success.
+
+---
+
+## Building from Source
 
 ### 1. Install toolchain dependencies
 
@@ -148,101 +232,41 @@ cp build/wiimote_pico_mouse.uf2 /run/media/$USER/RP2350/   # Fedora / Arch
 cp build/wiimote_pico_mouse.uf2 /media/$USER/RP2350/       # Debian / Ubuntu
 ```
 
-The Pico 2 W will reboot automatically and enumerate on Fedora as **`Wiimote IR Absolute Pointer + Media`**.
+The Pico 2 W will reboot automatically and enumerate as **`Wiimote IR Absolute Pointer + Media`**.
 
 ---
 
-## Usage, Pairing, and Calibration
+## Repository Structure
 
-### Bluetooth Pairing
-
-- **Permanent bonding (`SYNC`):** Press the red `SYNC` button under the Wiimote battery cover. The Pico 2 W discovers it, completes binary PIN authentication automatically, and stores the link key in Flash. Afterwards, pressing **`A`** (or any button) on the Wiimote reconnects automatically in ~1–2 seconds.
-- **Temporary pairing (`1 + 2`):** Hold `1 + 2` simultaneously while the Wiimote is off.
-
-Once connected and initialized:
-1. Wiimote **LED 1** lights up solid.
-2. **GP15** goes HIGH (`3.3 V`) to power on the **4 IR LEDs** around the TV.
-3. When the Wiimote powers off or disconnects, **GP15** immediately turns the IR LEDs off.
-
-### 2-Point On-Controller Calibration (No PC Software)
-
-1. Hold **`+` and `-` simultaneously for 3 seconds**. LED 1 starts blinking.
-2. The Pico places the USB pointer at the top-left target (**10 %, 10 %**). Aim at the cursor and press **`A`** (at least 2 IR LEDs must be visible).
-3. The Wiimote buzzes briefly and **LED 4** starts blinking. The pointer moves to the bottom-right target (**90 %, 90 %**). Aim and press **`A`**.
-4. Calibration is saved to internal Flash (survives reboots and power loss).
-
-Wiimote feedback during calibration:
-
-| Pattern | Meaning |
-|---|---|
-| LED 1 blinking | Waiting for the top-left sample |
-| Short buzz, then LED 4 blinking | Step 1 accepted, waiting for the bottom-right sample |
-| All LEDs solid + buzz (≈1 s), then LED 1 solid | Calibration saved to Flash |
-| LEDs 1+3 / 2+4 alternating + long buzz (≈1 s) | **Error:** degenerate sample (previous calibration restored) or Flash write failed |
-| LED 1 + very short buzz | Calibration cancelled (hold `+` and `-` for 3 s again while calibrating) |
-
----
-
-## Default Button & Media Mapping
-
-Defaults are defined in [`src/config.h`](src/config.h) / [`src/flash_storage.c`](src/flash_storage.c) and can be customized live over USB using the WebHID Configurator:
-
-| Wiimote Input | Fedora Linux USB HID Action |
-|---|---|
-| **IR Aiming** | Absolute screen pointer (`0..32767` × `0..32767`) |
-| **`B`** (trigger) | Left mouse button |
-| **`A`** | Right mouse button *(confirms point during calibration)* |
-| **D-Pad Up / Down** | Continuous vertical scroll wheel |
-| **D-Pad Left / Right** | Mouse Back / Forward navigation buttons |
-| **`+`** *(short press)* | Volume Increment |
-| **`-`** *(short press)* | Volume Decrement |
-| **`+` and `-`** *(hold 3 s)* | Enter / cancel calibration mode |
-| **`Home`** | Multimedia `Play / Pause` |
-| **`1`** | Middle mouse button |
-| **`2`** | `Super` / GNOME Activities Overview (`0xE3`) |
-
----
-
-## WebHID Button & Sensitivity Configurator (Linux)
-
-No Wi-Fi or host daemon is needed. Interface `1` (`ITF_NUM_HID_CFG`, Vendor Usage Page `0xFF00`, Usage `0x01`, Report ID `4`) lets Chromium/Chrome configure all 11 Wiimote buttons, 1-Euro smoothing (`min_cutoff`, `beta`), and `scroll_interval_ms` over USB and save them to the Pico's internal Flash.
-
-### 1. Install the `udev` rule (one-time setup)
-
-Copy [`docs/99-wiimote-pico.rules`](docs/99-wiimote-pico.rules) so your desktop session can access the Pico's `hidraw` vendor interface without `root`:
-
-```bash
-sudo cp docs/99-wiimote-pico.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules
-sudo udevadm trigger
+```text
+wiimote-pico-mouse/
+├── CMakeLists.txt
+├── pico_sdk_import.cmake
+├── LICENSE
+├── README.md
+├── docs/
+│   ├── 99-wiimote-pico.rules  # Linux udev rule for WebHID hidraw access
+│   ├── configurator.html      # Single-file WebHID keymap & 1-Euro tuner UI
+│   ├── wiring_diagram.md      # Circuit schematic, pinout, and resistor math
+│   ├── math_tracking.tex      # Homography, 4->3->2 LED fallback, and 1-Euro filter (LaTeX)
+│   └── math_tracking.pdf      # Compiled PDF of math_tracking.tex
+├── src/
+│   ├── main.c                 # Main 100 Hz loop, calibration, and HID pipeline
+│   ├── config.h               # GPIO pins, 1-Euro tuning, IR sensitivity, keymap schema
+│   ├── btstack_config.h       # BTstack Classic (BR/EDR) configuration
+│   ├── tusb_config.h          # TinyUSB Device HID configuration (2 HID interfaces)
+│   ├── usb_descriptors.c      # Composite HID (ITF 0) + Vendor WebHID Configurator (ITF 1)
+│   ├── usb_hid.c / .h         # Dynamic button mapping, HID queues, WebHID Feature Reports
+│   ├── wiimote_bt.c / .h      # L2CAP HID Host, pairing, PixArt init, 0x33 parser
+│   ├── diamond_tracker.c / .h # 4-LED homography, 3/2-LED recovery, calibration
+│   ├── one_euro_filter.c / .h # Adaptive 1-Euro anti-jitter filter
+│   ├── flash_storage.c / .h   # Internal Flash persistence (v2 + v1 migration) with CRC-32
+│   └── ir_leds.c / .h         # GP15 transistor power control
+└── tests/
+    ├── Makefile
+    ├── host_mocks/            # TinyUSB mock header for Linux host unit tests
+    └── test_suite.c           # Math, 0x33 parser, Flash, and HID unit tests
 ```
-
-*(If the Pico was already plugged in before adding the rule, unplug and replug its USB cable once.)*
-
-The same commands work on Fedora, Debian/Ubuntu, and Arch (anything using `systemd-udev`). Notes for other setups:
-
-- **No `uaccess` support / minimal desktops:** replace `TAG+="uaccess"` with `GROUP="plugdev"` (Debian/Ubuntu) or `GROUP="input"`, and add your user with `sudo usermod -aG plugdev $USER` (re-login required).
-- **Verify the rule applied:** `ls -l /dev/hidraw*` should show your user (via ACL) or the group with `rw` on the Pico's vendor interface; `udevadm info -a /dev/hidrawN | grep -E 'idVendor|idProduct'` should print `cafe` / `4010`.
-- **Flatpak/Snap browsers:** WebHID access may be sandboxed; use a native Chromium/Chrome package if the device does not appear in the chooser.
-
-### 2. Open the configurator
-
-**Easiest (hosted):** once Pages is enabled for your fork (Settings → Pages → Source: *GitHub Actions*; the [`pages.yml`](.github/workflows/pages.yml) workflow publishes it), open `https://<your-user>.github.io/wiimote-pico-mouse/` in Chromium/Chrome. No local server needed. The page also contains a first-time setup guide with a copy-paste command for the `udev` rule.
-
-**Local alternative:** serve `docs/configurator.html` yourself (see below).
-
-WebHID requires a secure context (`http://localhost` or `https://`), not `file://`. To run it locally, start Python's built-in HTTP server from the repository root:
-
-```bash
-python3 -m http.server 8000
-```
-
-Then open **`http://localhost:8000/docs/configurator.html`** in **Chromium** or **Google Chrome**:
-
-1. Click **Connect Pico (WebHID)** and select **`Wiimote IR Absolute Pointer + Media`**. On later visits the page reconnects automatically.
-2. Adjust any button binding (Mouse Button, Scroll Wheel, Keyboard Key, or Consumer Media) and/or tune `min_cutoff`, `beta`, and `scroll_interval_ms`.
-3. Optionally load a ready-made layout (*Mouse*, *Presentations*, *Media center*), or **Export / Import JSON** to back up and share profiles.
-4. Click **Save to Pico Flash** to apply the settings immediately and persist them across reboots, or **Reset Defaults (Pico Flash)** to restore factory defaults. The page waits for the Pico's confirmation and reports errors (bad CRC, out-of-range values, or a failed Flash write) instead of assuming success.
 
 ---
 
@@ -264,9 +288,9 @@ make -C tests test
 | Wiimote connects but cursor does not move | Check the 4 IR LEDs are powered (GP15 high, see [`docs/wiring_diagram.md`](docs/wiring_diagram.md)). Test them with a phone camera (IR glows purple). Make sure at least 2 LEDs are in view. |
 | Cursor jumps or drifts | Recalibrate (`+` and `-` for 3 s). Remove other IR sources (sunlight, candles, halogen lamps). |
 | Cursor lags or jitters | Tune `min_cutoff` / `beta` in the configurator (try the *Extra Steady Couch* or *Fast & Snappy* presets). |
-| Configurator says "WebHID is unavailable" | Use Chromium/Chrome and open `http://localhost:8000/docs/configurator.html` (not `file://`). |
-| Configurator warns "firmware is older" | Reflash the latest `.uf2` (CI uploads it as a build artifact). Older firmware still saves settings but cannot report Flash errors. |
-| Configurator can't see / open the Pico | Install the `udev` rule, replug the Pico, and close any other tab using the device. See the udev notes above. |
+| Configurator says "WebHID is unavailable" | Use Chromium/Chrome and open the hosted page or `http://localhost:8000/docs/configurator.html` (not `file://`). |
+| Configurator warns "firmware is older" | Reflash the latest `.uf2` (from GitHub Releases). Older firmware still saves settings but cannot report Flash errors. |
+| Configurator can't see / open the Pico | On Linux, install the `udev` rule, replug the Pico, and close any other tab using the device. See the udev notes above. |
 | "Writing to Flash FAILED" in the configurator | The setting is active for this session only. Replug the Pico and retry; if it persists, reflash the firmware. |
 | Wiimote shows the error LED pattern after calibration | The sample was degenerate (points too close or too few IR LEDs visible) or Flash failed. Retry from a normal seating distance. |
 | Pico is not detected in `BOOTSEL` | Use a data-capable USB cable; hold `BOOTSEL` *before* plugging in. |
