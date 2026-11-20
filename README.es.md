@@ -4,7 +4,7 @@
 
 Firmware en C (`pico-sdk`) para **Raspberry Pi Pico 2 W** (o **Pico W**) que conecta un **Wii Remote original** (`RVL-CNT-01` / `RVL-CNT-01-TR`) por **Bluetooth Classic** y lo expone por USB como un **puntero absoluto + teclado + teclas multimedia**. Funciona sin drivers ni software en el PC (Linux Wayland/X11).
 
-Los detalles de hardware (BOM, colocación de los 4 LEDs IR, esquema) están en el [README en inglés](README.md) y en [`docs/wiring_diagram.md`](docs/wiring_diagram.md). Las matemáticas del seguimiento están en [`docs/math_tracking.md`](docs/math_tracking.md).
+Los detalles de hardware (BOM, colocación de los 4 LEDs IR, esquema) están en el [README en inglés](README.md) y en [`docs/wiring_diagram.md`](docs/wiring_diagram.md). Las matemáticas del seguimiento están en [`docs/math_tracking.pdf`](docs/math_tracking.pdf) (fuente en [`docs/math_tracking.tex`](docs/math_tracking.tex)).
 
 ## Compilar y flashear
 

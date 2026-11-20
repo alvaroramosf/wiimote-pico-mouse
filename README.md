@@ -63,7 +63,8 @@ wiimote-pico-mouse/
 │   ├── 99-wiimote-pico.rules  # Fedora Linux udev rule for WebHID hidraw access
 │   ├── configurator.html      # Single-file WebHID keymap & 1-Euro tuner UI
 │   ├── wiring_diagram.md      # Circuit schematic, pinout, and resistor math
-│   └── math_tracking.md       # Homography, 4->3->2 LED fallback, and 1-Euro filter
+│   ├── math_tracking.tex      # Homography, 4->3->2 LED fallback, and 1-Euro filter (LaTeX)
+│   └── math_tracking.pdf      # Compiled PDF of math_tracking.tex
 ├── src/
 │   ├── main.c                 # Main 100 Hz loop, calibration, and HID pipeline
 │   ├── config.h               # GPIO pins, 1-Euro tuning, IR sensitivity, keymap schema
