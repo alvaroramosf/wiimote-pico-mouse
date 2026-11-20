@@ -124,7 +124,7 @@ const uint8_t *tud_hid_descriptor_report_cb(uint8_t instance) {
 
 static const uint8_t desc_configuration[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN,
-                          TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 150),
+                          TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 350),
     TUD_HID_DESCRIPTOR(ITF_NUM_HID, 0, HID_ITF_PROTOCOL_NONE,
                        sizeof(desc_hid_report), EPNUM_HID,
                        64, 5),

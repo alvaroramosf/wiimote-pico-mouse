@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "hardware/watchdog.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
 #include "tusb.h"
@@ -70,7 +71,12 @@ static bool feedback_tick(feedback_t *fb, uint32_t now_ms) {
     uint32_t t = now_ms - fb->start_ms;
     switch (fb->kind) {
     case FB_STEP_OK:
-        if (t >= 200U) { fb->kind = FB_NONE; fb->last_mask = 0xFFU; return false; }
+        if (t >= 200U) {
+            feedback_apply(fb, WIIMOTE_LED_4, false);
+            fb->kind = FB_NONE;
+            fb->last_mask = 0xFFU;
+            return false;
+        }
         feedback_apply(fb, WIIMOTE_LED_ALL, true);
         break;
     case FB_SUCCESS:
@@ -160,7 +166,10 @@ int main(void) {
     uint16_t last_usb_x = USB_HID_ABS_MAX / 2U;
     uint16_t last_usb_y = USB_HID_ABS_MAX / 2U;
 
+    watchdog_enable(2000, 1);
+
     while (true) {
+        watchdog_update();
         tud_task();
         wiimote_bt_task();
 
@@ -168,6 +177,7 @@ int main(void) {
         bool connected = wiimote_bt_is_connected();
 
         if (!connected && was_connected) {
+            usb_hid_process_wiimote(0, prev_buttons, last_usb_x, last_usb_y, false, now_ms);
             prev_buttons = 0;
             last_report_ms = 0;
             calib_combo_active = false;

@@ -43,8 +43,8 @@ bool wiimote_parse_report_0x33(const uint8_t *packet, uint16_t len, wiimote_repo
 
     /* 10-bit accelerometers centered around 512 (0x200) */
     uint16_t raw_ax = ((uint16_t)packet[4] << 2) | ((uint16_t)(packet[2] >> 5) & 0x03U);
-    uint16_t raw_ay = ((uint16_t)packet[5] << 2) | ((uint16_t)(packet[3] >> 5) & 0x02U);
-    uint16_t raw_az = ((uint16_t)packet[6] << 2) | ((uint16_t)(packet[3] >> 4) & 0x02U);
+    uint16_t raw_ay = ((uint16_t)packet[5] << 2) | ((uint16_t)(packet[3] >> 4) & 0x02U);
+    uint16_t raw_az = ((uint16_t)packet[6] << 2) | ((uint16_t)(packet[3] >> 5) & 0x02U);
 
     out->accel_x = (int16_t)raw_ax - 512;
     out->accel_y = (int16_t)raw_ay - 512;
@@ -398,6 +398,11 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
             uint16_t psm = l2cap_event_incoming_connection_get_psm(packet);
             uint16_t local_cid = l2cap_event_incoming_connection_get_local_cid(packet);
             l2cap_event_incoming_connection_get_address(packet, event_addr);
+
+            if (s_bt_state == BT_STATE_CONNECTED || s_bt_state == BT_STATE_INIT_WIIMOTE) {
+                l2cap_decline_connection(local_cid);
+                break;
+            }
 
             if (psm == PSM_HID_CONTROL) {
                 gap_inquiry_stop();
