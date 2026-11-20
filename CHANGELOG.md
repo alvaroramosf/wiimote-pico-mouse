@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/). The version lives in the [`VERSION`](VERSION) file.
 
-## [0.1.0-beta] - Unreleased
+## [0.1.0-beta] - 2026-11-20
 
 First public pre-release. Not yet validated on real hardware.
 
@@ -20,7 +20,7 @@ First public pre-release. Not yet validated on real hardware.
   Flash failure) is reported back to the configurator.
 - Host unit tests, CI (tests with ASan/UBSan, firmware builds for `pico2_w` and `pico_w`), and a tag-driven
   release workflow.
-- English and Spanish documentation, including per-distro setup and troubleshooting.
+- Documentation, including per-distro setup and troubleshooting.
 
 ### Notes
 - Firmware binaries link BTstack (non-commercial license) and cyw43-driver (Raspberry Pi hardware only); see `THIRD_PARTY_LICENSES.md`.
