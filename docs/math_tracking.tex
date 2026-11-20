@@ -1,0 +1,351 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\code}[1]{\texttt{#1}}
+\DeclareMathOperator{\atandos}{atan2}
+\DeclareMathOperator{\clamp}{clamp}
+
+\newenvironment{idea}
+  {\par\medskip\noindent\begingroup\color{blue!50!black}\textbf{Idea clave.}\ }
+  {\endgroup\par\medskip}
+
+\title{Matemáticas del seguimiento en diamante\\\large (4 $\to$ 3 $\to$ 2 LEDs)}
+\author{\code{wiimote-pico-mouse}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Este documento explica la canalización geométrica implementada en
+\code{src/diamond\_tracker.c} y \code{src/one\_euro\_filter.c}. Su objetivo es
+convertir las detecciones infrarrojas de la cámara PixArt del Wiimote en un
+puntero USB HID absoluto, sin temblor y sin saltos cuando se pierden LEDs.
+\end{abstract}
+
+\tableofcontents
+
+\section{Visión general}
+
+La barra de sensores se sustituye por cuatro LEDs IR colocados en los vértices
+de un rombo (diamante) alrededor del televisor: \emph{Arriba} (\code{Top}),
+\emph{Derecha} (\code{Right}), \emph{Abajo} (\code{Bottom}) e
+\emph{Izquierda} (\code{Left}). La cámara del Wiimote ve esos puntos; si
+sabemos \emph{dónde} caen en la imagen, podemos deducir \emph{hacia dónde}
+apunta el mando.
+
+El proceso, en cada fotograma, es:
+\begin{enumerate}[nosep]
+  \item Centrar las coordenadas de la cámara y medir la inclinación (roll)
+        con el acelerómetro (sección~\ref{sec:camara}).
+  \item Según cuántos LEDs se vean, reconstruir los cuatro vértices:
+        4 LEDs (sec.~\ref{sec:cuatro}), 3 LEDs (sec.~\ref{sec:tres}) o
+        2 LEDs (sec.~\ref{sec:dos}).
+  \item Calcular con una homografía a qué punto de la pantalla apunta el
+        centro óptico de la cámara.
+  \item Corregir con la calibración (sec.~\ref{sec:calib}) y suavizar con el
+        filtro 1€ (sec.~\ref{sec:filtro}).
+\end{enumerate}
+
+%------------------------------------------------------------------
+\section{Sistema de coordenadas de la cámara y roll}
+\label{sec:camara}
+
+\subsection{Centrado de coordenadas}
+
+La cámara PixArt devuelve hasta 4 puntos válidos sobre una cuadrícula de
+$1024 \times 768$ píxeles, con centro óptico en $(512, 384)$. Para que los ejes
+coincidan con los de la pantalla ($+u$ hacia la derecha, $+v$ hacia abajo)
+se transforma cada punto crudo $(x_{\text{raw}}, y_{\text{raw}})$ así:
+\begin{equation}
+  u = 512 - x_{\text{raw}}, \qquad v = y_{\text{raw}} - 384 .
+\end{equation}
+Con esto, el eje óptico (el punto al que apunta el Wiimote) queda siempre en
+el origen $(u,v) = (0,0)$.
+
+\begin{idea}
+Todo el problema se reduce a una pregunta: \emph{¿en qué lugar del rombo
+detectado cae el origen $(0,0)$?} Esa posición relativa es el punto de la
+pantalla al que apuntamos.
+\end{idea}
+
+\subsection{Inclinación del mando (roll)}
+
+El acelerómetro ADXL330 (10 bits, centrado en \code{512} en el informe
+\code{0x33}) mide el vector de gravedad $(a_x, a_y, a_z)$. De él se obtiene
+cuánto está girado el mando sobre su eje de apuntado:
+\begin{equation}
+  \theta_{\text{roll}} = \atandos(a_x, a_z) .
+\end{equation}
+Para devolver un vector de cámara $\vect{p} = (u,v)$ al plano «vertical» del
+televisor se aplica la rotación
+\begin{equation}
+  R(\theta_{\text{roll}}) =
+  \begin{bmatrix}
+    \cos\theta_{\text{roll}} & -\sin\theta_{\text{roll}} \\
+    \sin\theta_{\text{roll}} &  \cos\theta_{\text{roll}}
+  \end{bmatrix}.
+\end{equation}
+
+%------------------------------------------------------------------
+\section{Estado de 4 LEDs: homografía proyectiva 2D}
+\label{sec:cuatro}
+
+Cuando se ven los cuatro vértices del rombo, hay información suficiente para
+resolver el problema de forma exacta.
+
+\subsection{Identificación de los vértices}
+
+La cámara entrega los puntos sin etiquetar, así que hay que decidir cuál es
+\code{Top}, \code{Right}, \code{Bottom} y \code{Left}. Se evalúan las
+$4! = 24$ permutaciones y se descartan las que producen un cuadrilátero
+autointersectado, exigiendo
+\begin{equation}
+  (P_R - P_L) \times (P_B - P_T) > 0 ,
+\end{equation}
+donde $\times$ es el producto vectorial 2D (determinante). Cada permutación
+candidata se puntúa con dos criterios:
+\begin{itemize}[nosep]
+  \item \textbf{Alineación:} los vectores respecto al centroide, desrotados
+        con $R(\theta_{\text{roll}})$, deben parecerse a las direcciones
+        canónicas $\{(0,-1),\,(1,0),\,(0,1),\,(-1,0)\}$.
+  \item \textbf{Continuidad temporal:} deben parecerse a los vértices del
+        fotograma anterior, rotados $-\Delta\theta_{\text{roll}}$ para
+        compensar el giro de la mano.
+\end{itemize}
+
+\subsection{Cálculo de la homografía}
+
+Una homografía es una transformación proyectiva del plano, descrita por una
+matriz $H$ de $3\times 3$ (con $h_8 = 1$ para fijar la escala) que lleva los
+cuatro vértices de la cámara $P_k = (u_k, v_k)$ a los puntos objetivo
+normalizados de la pantalla $(X_k, Y_k)$:
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Vértice & Destino normalizado $(X_k, Y_k)$ \\
+\midrule
+\code{Top}    ($k=0$) & $(0{,}5;\ 0{,}0)$ \\
+\code{Right}  ($k=1$) & $(1{,}0;\ 0{,}5)$ \\
+\code{Bottom} ($k=2$) & $(0{,}5;\ 1{,}0)$ \\
+\code{Left}   ($k=3$) & $(0{,}0;\ 0{,}5)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Para un punto $(u,v)$, la transformación es
+\begin{equation}
+  X = \frac{h_0 u + h_1 v + h_2}{h_6 u + h_7 v + 1}, \qquad
+  Y = \frac{h_3 u + h_4 v + h_5}{h_6 u + h_7 v + 1}.
+\end{equation}
+Multiplicando por el denominador, cada correspondencia $P_k \mapsto (X_k,Y_k)$
+da \emph{dos ecuaciones lineales} en las incógnitas $h_0,\dots,h_7$:
+\begin{align}
+  u_k h_0 + v_k h_1 + h_2 - X_k u_k h_6 - X_k v_k h_7 &= X_k, \\
+  u_k h_3 + v_k h_4 + h_5 - Y_k u_k h_6 - Y_k v_k h_7 &= Y_k.
+\end{align}
+Con 4 vértices se obtiene un sistema $8\times 8$, que se resuelve en doble
+precisión por eliminación gaussiana con pivoteo parcial (tras normalizar las
+coordenadas para mejorar la estabilidad numérica).
+
+\subsection{Punto de apuntado}
+
+Como el eje óptico está en $(u,v) = (0,0)$, el denominador vale $1$ y los
+términos con $u,v$ se anulan, de modo que
+\begin{equation}
+  X_{\text{raw}} = h_2, \qquad Y_{\text{raw}} = h_5 .
+\end{equation}
+
+\subsection{Estado geométrico que se guarda en cada fotograma}
+
+Cada fotograma de 4 LEDs actualiza:
+\begin{itemize}[nosep]
+  \item Las diagonales $\vect{d}_H = P_R - P_L$ y $\vect{d}_V = P_B - P_T$,
+        sus longitudes $L_H = \norm{\vect{d}_H}$, $L_V = \norm{\vect{d}_V}$ y
+        la relación de aspecto $\rho = L_H / L_V$.
+  \item Los puntos medios $M_H = (P_L + P_R)/2$ y $M_V = (P_T + P_B)/2$, y el
+        desplazamiento por perspectiva
+        \begin{equation}
+          \boldsymbol{\delta} = M_V - M_H
+            = \alpha_H \vect{d}_H + \alpha_V \vect{d}_V ,
+        \end{equation}
+        que mide cuánto se desvían los centros de ambas diagonales debido a
+        la perspectiva (en un rombo perfectamente frontal, $\boldsymbol\delta = 0$).
+  \item Una plantilla de referencia sin deriva, \code{ref\_vertices[4]}, y su
+        ángulo \code{ref\_roll}.
+\end{itemize}
+
+%------------------------------------------------------------------
+\section{Estado de 3 LEDs: reconstrucción del cuarto vértice}
+\label{sec:tres}
+
+Si un LED sale del campo de visión o queda oculto, quedan 3 puntos. La idea es
+\emph{inventar} el vértice que falta con la geometría aprendida y alimentar la
+misma homografía de la sección anterior, de modo que el cursor no salte.
+
+Se evalúan las $4 \times 3! = 24$ asignaciones posibles
+(\code{hueco\_que\_falta}, permutación de los 3 puntos).
+
+\paragraph{Caso A: falta \code{Top} o \code{Bottom}.}
+La diagonal horizontal $\vect{d}_H = P_R - P_L$ está completa. La diagonal
+vertical se estima girando $90^\circ$ y escalando por la relación de aspecto:
+\begin{equation}
+  \vect{d}_{V,\text{aprox}} = \frac{(-d_{H,v},\ d_{H,u})}{\rho}.
+\end{equation}
+El punto medio vertical, corregido por perspectiva, es
+\begin{equation}
+  M_V = M_H + \alpha_H \vect{d}_H + \alpha_V \vect{d}_{V,\text{aprox}},
+\end{equation}
+y el vértice ausente se obtiene por \emph{reflexión} del opuesto respecto a
+$M_V$:
+\begin{equation}
+  P_{\text{falta}} = 2 M_V - P_{\text{opuesto}} .
+\end{equation}
+
+\paragraph{Caso B: falta \code{Left} o \code{Right}.}
+Simétricamente, con $\vect{d}_V = P_B - P_T$ completa:
+\begin{equation}
+  \vect{d}_{H,\text{aprox}} = (d_{V,v},\ -d_{V,u})\cdot\rho ,
+\end{equation}
+\begin{equation}
+  M_H = M_V - \alpha_H \vect{d}_{H,\text{aprox}} - \alpha_V \vect{d}_V,
+  \qquad
+  P_{\text{falta}} = 2 M_H - P_{\text{opuesto}} .
+\end{equation}
+
+\paragraph{Elección de la mejor hipótesis.}
+Gana el candidato que minimiza una combinación de:
+\begin{itemize}[nosep]
+  \item el error de aristas por pares, invariante a traslación, respecto al
+        fotograma anterior actualizado con el roll;
+  \item la continuidad espacial de los 3 puntos visibles;
+  \item una preferencia por reconstrucciones que caen \emph{fuera} del
+        rectángulo del sensor (es lo esperable si el LED ha salido del campo).
+\end{itemize}
+
+%------------------------------------------------------------------
+\section{Estado de 2 LEDs: semejanza 2D con roll del acelerómetro}
+\label{sec:dos}
+
+En televisores grandes o a poca distancia, al apuntar a una esquina pueden
+verse solo 2 LEDs adyacentes (por ejemplo \code{Top} y \code{Right}). Con dos
+puntos no se puede calcular una homografía, pero sí una \emph{semejanza}
+(escala uniforme + rotación + traslación).
+
+\begin{enumerate}
+  \item \textbf{Plantilla rotada.} La plantilla \code{ref\_vertices[4]},
+        guardada en el último fotograma de 4 LEDs, se rota al roll actual con
+        $\Delta\theta = \theta_{\text{roll}} - \theta_{\text{ref}}$,
+        obteniendo los vectores $\vect{r}_k$.
+  \item \textbf{Identificar el par.} Se puntúan los $4\times 3 = 12$ pares
+        ordenados $(a,b)$ comparando el vector observado
+        $\vect{o} = P_1 - P_0$ con el de la plantilla
+        $\vect{e} = \vect{r}_b - \vect{r}_a$ en ángulo, escala y cercanía
+        temporal a \code{last\_vertices}.
+  \item \textbf{Semejanza exacta.} Para el par ganador $(a,b)$, buscamos la
+        transformación que lleva $\vect{r}_a \mapsto P_0$ y
+        $\vect{r}_b \mapsto P_1$. Escrita como número complejo $c + i d$ (que
+        codifica a la vez escala y giro), sus coeficientes son
+        \begin{equation}
+          c = \frac{\vect{o}\cdot\vect{e}}{\norm{\vect{e}}^2}, \qquad
+          d = \frac{o_v e_u - o_u e_v}{\norm{\vect{e}}^2}.
+        \end{equation}
+        Con ellos se reconstruyen los 4 vértices:
+        \begin{equation}
+          V_k = \frac{P_0 + P_1}{2} +
+          \begin{bmatrix} c & -d \\ d & c \end{bmatrix}
+          \left(\vect{r}_k - \frac{\vect{r}_a + \vect{r}_b}{2}\right).
+        \end{equation}
+  \item \textbf{Sin deriva.} Como \code{ref\_vertices} \emph{nunca} se
+        sobrescribe en modo 2 LEDs, no se acumula error geométrico aunque el
+        puntero permanezca indefinidamente en una esquina.
+\end{enumerate}
+
+Los 4 vértices $V_k$ pasan después por la misma homografía de la
+sección~\ref{sec:cuatro}.
+
+%------------------------------------------------------------------
+\section{Estado de 1 o 0 LEDs}
+
+Con menos de 2 LEDs visibles no hay información geométrica suficiente: el
+puntero se queda congelado en la última posición válida, mientras todos los
+botones del Wiimote siguen funcionando.
+
+%------------------------------------------------------------------
+\section{Calibración afín de 2 puntos (Flash)}
+\label{sec:calib}
+
+Para compensar el marco del televisor y las tolerancias de montaje, el modo de
+calibración (mantener \code{+} y \code{-} durante 3\,s) fija el cursor USB en
+dos objetivos conocidos de la pantalla,
+\begin{equation}
+  T_1 = (0{,}10;\ 0{,}10), \qquad T_2 = (0{,}90;\ 0{,}90),
+\end{equation}
+y al pulsar \code{A} registra las salidas crudas de la homografía
+$P_1$ y $P_2$ en cada objetivo. Para el eje $X$ se calcula una recta
+$X_{\text{cal}} = s_x X_{\text{raw}} + b_x$ que pasa por ambos puntos:
+\begin{equation}
+  s_x = \frac{0{,}90 - 0{,}10}{P_{2,x} - P_{1,x}}, \qquad
+  b_x = 0{,}10 - s_x P_{1,x},
+\end{equation}
+\begin{equation}
+  X_{\text{cal}} = \clamp_{[0,1]}\!\left(s_x X_{\text{raw}} + b_x\right).
+\end{equation}
+El eje $Y$ se trata de forma análoga. Los coeficientes y las diagonales de
+referencia se guardan en Flash, protegidos por una cabecera mágica y un
+CRC-32 IEEE 802.3.
+
+%------------------------------------------------------------------
+\section{Filtro 1€ adaptativo}
+\label{sec:filtro}
+
+La mano tiembla de forma natural, y a $\ge 2{,}5$\,m ese temblor se amplifica
+en pantalla. Un filtro paso bajo fijo eliminaría el temblor, pero añadiría
+retardo a los movimientos rápidos. El filtro 1€ resuelve el dilema variando la
+frecuencia de corte con la velocidad: \emph{poca velocidad $\Rightarrow$ mucho
+suavizado; mucha velocidad $\Rightarrow$ poco suavizado}.
+Se aplica por eje a $(X_{\text{cal}}, Y_{\text{cal}})$
+(\code{src/one\_euro\_filter.c}). Sea $x_i$ la muestra actual y $\Delta t$ el
+tiempo entre muestras.
+
+\paragraph{Coeficiente de suavizado.} Un filtro paso bajo de primer orden con
+frecuencia de corte $f$ usa
+\begin{equation}
+  \alpha(\Delta t, f) = \frac{2\pi f \Delta t}{1 + 2\pi f \Delta t},
+  \qquad
+  \mathrm{LPF}(x, \alpha) = \alpha\, x + (1-\alpha)\, x_{\text{prev}} .
+\end{equation}
+
+\paragraph{Paso 1: velocidad suavizada.} Se estima la velocidad y se filtra
+con un corte fijo $f_d = 1{,}0$\,Hz:
+\begin{equation}
+  v_{\text{filt},i} = \mathrm{LPF}\!\left(
+    \frac{x_i - x_{\text{filt},i-1}}{\Delta t},\ \alpha(\Delta t, f_d)\right).
+\end{equation}
+
+\paragraph{Paso 2: corte adaptativo.} La frecuencia de corte crece con el
+módulo de la velocidad ($f_{c,\min} = 1{,}2$\,Hz y $\beta = 2{,}5$ para
+coordenadas normalizadas en $[0,1]$):
+\begin{equation}
+  f_c = f_{c,\min} + \beta\,\lvert v_{\text{filt},i}\rvert .
+\end{equation}
+
+\paragraph{Paso 3: posición filtrada.}
+\begin{equation}
+  x_{\text{filt},i} = \mathrm{LPF}\!\left(x_i,\ \alpha(\Delta t, f_c)\right).
+\end{equation}
+Este $x_{\text{filt},i}$ es el valor final que se envía al puntero USB HID
+absoluto.
+
+\end{document}
