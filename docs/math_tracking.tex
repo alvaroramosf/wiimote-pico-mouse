@@ -68,7 +68,7 @@ grid whose optical center lies at $(512, 384)$. To align the axes with the
 screen ($+u$ right, $+v$ down), each raw detection $(x_{\text{raw}},
 y_{\text{raw}})$ is centered as:
 \begin{equation}
-  u = 512 - x_{\text{raw}}, \qquad v = y_{\text{raw}} - 384 .
+  u = x_{\text{raw}} - 512, \qquad v = 384 - y_{\text{raw}} .
 \end{equation}
 With this convention, the optical axis (where the Wiimote is aimed) always sits
 at the origin $(u,v) = (0,0)$.

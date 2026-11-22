@@ -27,9 +27,11 @@
 
 /* Raw PixArt coordinates are converted into camera-centered (u, v) where
  * +u points RIGHT and +v points DOWN relative to the TV image.
- * Set to 1 to mirror an axis (512 - raw_x) or 0 to keep (raw_y - 384). */
-#define WIIMOTE_IR_INVERT_X             1
-#define WIIMOTE_IR_INVERT_Y             0
+ * On the Wiimote PixArt camera, raw X increases left->right (u = raw_x - 512)
+ * and raw Y increases bottom->top (v = 384 - raw_y).
+ * Set to 1 to mirror an axis (center - raw) or 0 to keep (raw - center). */
+#define WIIMOTE_IR_INVERT_X             0
+#define WIIMOTE_IR_INVERT_Y             1
 
 /* Multiply accelerometer roll atan2(ax, az) by +1 or -1 if needed. */
 #define WIIMOTE_ACCEL_ROLL_SIGN         1

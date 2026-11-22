@@ -783,7 +783,7 @@ bool diamond_tracker_calibration_confirm_step(diamond_tracker_t *t, bool *out_fi
     if (t->calib_state == CALIB_STEP2_BOTTOM_RIGHT) {
         float dx = t->raw_norm_x - t->calib_p1_x;
         float dy = t->raw_norm_y - t->calib_p1_y;
-        if (fabsf(dx) < 0.05f || fabsf(dy) < 0.05f) {
+        if (dx < 0.05f || dy < 0.05f) {
             diamond_tracker_cancel_calibration(t);
             return false;
         }

@@ -117,6 +117,22 @@ static int test_4_led_homography(void) {
         ASSERT_NEAR(t.raw_norm_y, poses[i][1], 0.01f);
     }
 
+    /* Non-tautological raw PixArt check (raw_x: left->right, raw_y: bottom->top)
+     * Aiming at Top-Left (0.25, 0.25): L at u=-100 (raw_x=412), R at u=+300 (raw_x=812),
+     * T at v=-100 (raw_y=484), B at v=+300 (raw_y=84). */
+    diamond_tracker_t t_raw;
+    diamond_tracker_init(&t_raw);
+    const ir_point_t raw_tl[4] = {
+        {612, 484, 3, true}, /* TOP */
+        {812, 284, 3, true}, /* RIGHT */
+        {612,  84, 3, true}, /* BOTTOM */
+        {412, 284, 3, true}  /* LEFT */
+    };
+    diamond_tracker_update(&t_raw, raw_tl, 0, 0, 100);
+    ASSERT_TRUE(t_raw.visible_leds == 4);
+    ASSERT_NEAR(t_raw.raw_norm_x, 0.25f, 0.01f);
+    ASSERT_NEAR(t_raw.raw_norm_y, 0.25f, 0.01f);
+
     printf("[PASS] test_4_led_homography\n");
     return 0;
 }
@@ -284,6 +300,24 @@ static int test_calibration_and_flash(void) {
     diamond_tracker_update(&t2, ir, ax, 0, az);
     ASSERT_NEAR(t2.cal_norm_x, 0.10f, 0.01f);
     ASSERT_NEAR(t2.cal_norm_y, 0.10f, 0.01f);
+
+    /* Verify inverted calibration (Step 1 bottom-right, Step 2 top-left) is rejected */
+    float prev_sx = 0.0f, prev_sy = 0.0f;
+    diamond_tracker_get_calibration(&t2, &prev_sx, &prev_sy, NULL, NULL);
+    diamond_tracker_start_calibration(&t2);
+    simulate_diamond_camera(0.80f, 0.80f, 0.0f, 200.0f, 120.0f, 0.0f, ir, &ax, &az);
+    diamond_tracker_update(&t2, ir, ax, 0, az);
+    ASSERT_TRUE(diamond_tracker_calibration_confirm_step(&t2, &finished));
+    ASSERT_TRUE(!finished);
+    simulate_diamond_camera(0.20f, 0.20f, 0.0f, 200.0f, 120.0f, 0.0f, ir, &ax, &az);
+    diamond_tracker_update(&t2, ir, ax, 0, az);
+    ASSERT_TRUE(!diamond_tracker_calibration_confirm_step(&t2, &finished));
+    ASSERT_TRUE(!finished);
+    ASSERT_TRUE(t2.calib_state == CALIB_IDLE);
+    float cur_sx = 0.0f, cur_sy = 0.0f;
+    diamond_tracker_get_calibration(&t2, &cur_sx, &cur_sy, NULL, NULL);
+    ASSERT_NEAR(cur_sx, prev_sx, 1e-6f);
+    ASSERT_NEAR(cur_sy, prev_sy, 1e-6f);
 
     /* Verify CRC-32 detects tampering */
     persistent_storage_t bad = loaded;

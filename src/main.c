@@ -125,17 +125,23 @@ int main(void) {
     persistent_storage_t storage;
     bool flash_ok = flash_storage_load(&storage);
     if (flash_ok && storage.has_calibration) {
-        diamond_tracker_set_calibration(&tracker,
-                                        storage.calib.scale_x,
-                                        storage.calib.scale_y,
-                                        storage.calib.offset_x,
-                                        storage.calib.offset_y);
-        if (storage.calib.ref_diag_h > DIAMOND_MIN_SPAN_PX &&
-            storage.calib.ref_diag_v > DIAMOND_MIN_SPAN_PX) {
-            tracker.diag_h = storage.calib.ref_diag_h;
-            tracker.diag_v = storage.calib.ref_diag_v;
+        if (isfinite(storage.calib.scale_x) && isfinite(storage.calib.scale_y) &&
+            isfinite(storage.calib.offset_x) && isfinite(storage.calib.offset_y) &&
+            storage.calib.scale_x > 0.0f && storage.calib.scale_y > 0.0f) {
+            diamond_tracker_set_calibration(&tracker,
+                                            storage.calib.scale_x,
+                                            storage.calib.scale_y,
+                                            storage.calib.offset_x,
+                                            storage.calib.offset_y);
+            if (storage.calib.ref_diag_h > DIAMOND_MIN_SPAN_PX &&
+                storage.calib.ref_diag_v > DIAMOND_MIN_SPAN_PX) {
+                tracker.diag_h = storage.calib.ref_diag_h;
+                tracker.diag_v = storage.calib.ref_diag_v;
+            }
+            printf("Loaded saved calibration from Flash.\n");
+        } else {
+            printf("Ignored invalid/negative saved calibration from Flash; using identity.\n");
         }
-        printf("Loaded saved calibration from Flash.\n");
     }
 
     one_euro_2d_t filter;
