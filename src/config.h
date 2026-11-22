@@ -82,17 +82,19 @@
 /* ============================================================================
  * Button Mapping & Scroll Tuning
  * ============================================================================ */
-#define SCROLL_INTERVAL_MS              40      /* ~25 ticks/s while holding Up/Down */
+#define SCROLL_INTERVAL_MS              120     /* ~8.3 ticks/s while holding 1/2 */
 #define SCROLL_INTERVAL_MIN_MS          5U
 #define SCROLL_INTERVAL_MAX_MS          1000U
 #define SCROLL_STEP_AMOUNT              1
 #define SHORT_PRESS_MAX_MS              1000    /* '+' / '-' release < 1s -> volume */
+#define LONG_PRESS_RIGHT_CLICK_MS       2000U   /* 'A' hold >= 2s -> right click */
 
-/* Keycode for Wiimote button '2': 0xE3 = HID Left GUI (Super / GNOME Activities) */
+/* Keycode for Super / GNOME Activities: 0xE3 = HID Left GUI */
 #define WIIMOTE_BTN_2_KEYCODE           0xE3
 
 /* Consumer Control Usage Codes (USB HID Usage Page 0x0C) */
 #define HID_CONSUMER_PLAY_PAUSE         0x00CD
+#define HID_CONSUMER_MUTE               0x00E2
 #define HID_CONSUMER_VOLUME_INCREMENT   0x00E9
 #define HID_CONSUMER_VOLUME_DECREMENT   0x00EA
 

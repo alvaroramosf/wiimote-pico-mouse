@@ -428,34 +428,70 @@ static int test_usb_hid_and_ir_leds(void) {
 
     usb_hid_init();
 
-    /* B + Up + Home + 2 */
-    uint16_t btns = WIIMOTE_BTN_B | WIIMOTE_BTN_UP | WIIMOTE_BTN_HOME | WIIMOTE_BTN_TWO;
+    /* B + 1 (Scroll Up) + Home (Super) */
+    uint16_t btns = WIIMOTE_BTN_B | WIIMOTE_BTN_ONE | WIIMOTE_BTN_HOME;
     usb_hid_process_wiimote(btns, 0, 12345, 22222, false, 100);
     wiimote_abs_mouse_report_t m = usb_hid_test_get_last_mouse();
     ASSERT_TRUE(m.buttons == HID_MOUSE_BTN_LEFT);
     ASSERT_TRUE(m.x == 12345 && m.y == 22222);
     ASSERT_TRUE(m.wheel == 1);
 
-    /* Consumer Play/Pause + release */
-    ASSERT_TRUE(usb_hid_test_pop_consumer() == HID_CONSUMER_PLAY_PAUSE);
-    ASSERT_TRUE(usb_hid_test_pop_consumer() == 0x0000U);
+    /* 2 -> Scroll Down after scroll_interval_ms (120 ms) */
+    usb_hid_process_wiimote(WIIMOTE_BTN_TWO, btns, 12345, 22222, false, 230);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.wheel == -1);
+    usb_hid_process_wiimote(0, WIIMOTE_BTN_TWO, 12345, 22222, false, 240);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.buttons == 0U);
 
-    /* Keyboard Super/GUI key + release */
+    /* Keyboard Super/GUI key + release (Home) */
     bool kb_ok = false;
     wiimote_keyboard_report_t kb = usb_hid_test_pop_keyboard(&kb_ok);
     ASSERT_TRUE(kb_ok && kb.modifier == 0x08U);
     kb = usb_hid_test_pop_keyboard(&kb_ok);
     ASSERT_TRUE(kb_ok && kb.modifier == 0x00U);
 
+    /* A short press (< 2s) -> Left Click tap on release */
+    usb_hid_process_wiimote(WIIMOTE_BTN_A, 0, 1000, 1000, false, 300);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.buttons == 0U);
+    usb_hid_process_wiimote(0, WIIMOTE_BTN_A, 1000, 1000, false, 500);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.buttons == HID_MOUSE_BTN_LEFT);
+    usb_hid_process_wiimote(0, 0, 1000, 1000, false, 510);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.buttons == 0U);
+
+    /* A long press (>= 2s) -> Right Click at 2s, no Left Click on release */
+    usb_hid_process_wiimote(WIIMOTE_BTN_A, 0, 1000, 1000, false, 600);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.buttons == 0U);
+    usb_hid_process_wiimote(WIIMOTE_BTN_A, WIIMOTE_BTN_A, 1000, 1000, false, 2600);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.buttons == HID_MOUSE_BTN_RIGHT);
+    usb_hid_process_wiimote(0, WIIMOTE_BTN_A, 1000, 1000, false, 2700);
+    m = usb_hid_test_get_last_mouse();
+    ASSERT_TRUE(m.buttons == 0U);
+
     /* Short '+' tap -> Volume Increment */
-    usb_hid_process_wiimote(WIIMOTE_BTN_PLUS, 0, 1000, 1000, false, 200);
-    usb_hid_process_wiimote(0, WIIMOTE_BTN_PLUS, 1000, 1000, false, 350);
+    usb_hid_process_wiimote(WIIMOTE_BTN_PLUS, 0, 1000, 1000, false, 2800);
+    usb_hid_process_wiimote(0, WIIMOTE_BTN_PLUS, 1000, 1000, false, 2950);
     ASSERT_TRUE(usb_hid_test_pop_consumer() == HID_CONSUMER_VOLUME_INCREMENT);
     ASSERT_TRUE(usb_hid_test_pop_consumer() == 0x0000U);
 
-    /* Holding '+' and '-' together for calibration must NOT emit volume events */
-    usb_hid_process_wiimote(WIIMOTE_BTN_PLUS | WIIMOTE_BTN_MINUS, 0, 1000, 1000, false, 500);
-    usb_hid_process_wiimote(0, WIIMOTE_BTN_PLUS | WIIMOTE_BTN_MINUS, 1000, 1000, false, 3600);
+    /* Long '-' hold (>= 1s) -> Mute toggle, no Volume Decrement on release */
+    usb_hid_process_wiimote(WIIMOTE_BTN_MINUS, 0, 1000, 1000, false, 3000);
+    usb_hid_process_wiimote(WIIMOTE_BTN_MINUS, WIIMOTE_BTN_MINUS, 1000, 1000, false, 4050);
+    ASSERT_TRUE(usb_hid_test_pop_consumer() == HID_CONSUMER_MUTE);
+    ASSERT_TRUE(usb_hid_test_pop_consumer() == 0x0000U);
+    usb_hid_process_wiimote(0, WIIMOTE_BTN_MINUS, 1000, 1000, false, 4200);
+    ASSERT_TRUE(usb_hid_test_pop_consumer() == 0xFFFFU);
+
+    /* Holding '+' and '-' together for calibration must NOT emit volume or mute */
+    usb_hid_process_wiimote(WIIMOTE_BTN_PLUS | WIIMOTE_BTN_MINUS, 0, 1000, 1000, false, 5000);
+    usb_hid_process_wiimote(WIIMOTE_BTN_PLUS | WIIMOTE_BTN_MINUS,
+                            WIIMOTE_BTN_PLUS | WIIMOTE_BTN_MINUS, 1000, 1000, false, 6500);
+    usb_hid_process_wiimote(0, WIIMOTE_BTN_PLUS | WIIMOTE_BTN_MINUS, 1000, 1000, false, 8100);
     ASSERT_TRUE(usb_hid_test_pop_consumer() == 0xFFFFU);
 
     /* Verify USB descriptors are valid */

@@ -37,6 +37,7 @@ static const uint16_t k_wiimote_btn_masks[WIIMOTE_MAP_BTN_COUNT] = {
 
 static wiimote_abs_mouse_report_t s_mouse_state;
 static bool s_mouse_dirty = false;
+static uint8_t s_pending_mouse_release_btns = 0;
 static int16_t s_pending_wheel = 0;
 
 /* Active runtime keymap + filter handle */
@@ -127,6 +128,7 @@ void usb_hid_init(void) {
     s_mouse_state.x = USB_HID_ABS_MAX / 2U;
     s_mouse_state.y = USB_HID_ABS_MAX / 2U;
     s_mouse_dirty = false;
+    s_pending_mouse_release_btns = 0;
     s_pending_wheel = 0;
     s_last_scroll_ms = 0;
 
@@ -210,6 +212,7 @@ void usb_hid_process_wiimote(uint16_t buttons, uint16_t prev_buttons,
     bool wheel_fired = false;
 
     uint8_t mouse_btns = 0;
+    uint8_t mouse_pulse_btns = 0;
     wiimote_keyboard_report_t held_kb;
     memset(&held_kb, 0, sizeof(held_kb));
     uint16_t held_consumer = 0;
@@ -247,7 +250,20 @@ void usb_hid_process_wiimote(uint16_t buttons, uint16_t prev_buttons,
 
         switch (b.action_type) {
         case ACTION_MOUSE_BTN:
-            if (now_pressed) {
+            if ((b.flags & BINDING_FLAG_SHORT_PRESS) != 0U && i == WIIMOTE_IDX_A) {
+                if (now_pressed && !prev_pressed) {
+                    s_btn_down_ms[i] = now_ms;
+                    s_btn_tap_armed[i] = true;
+                } else if (now_pressed && s_btn_tap_armed[i]) {
+                    if ((now_ms - s_btn_down_ms[i]) >= LONG_PRESS_RIGHT_CLICK_MS) {
+                        mouse_pulse_btns |= HID_MOUSE_BTN_RIGHT;
+                        s_btn_tap_armed[i] = false;
+                    }
+                } else if (!now_pressed && prev_pressed && s_btn_tap_armed[i]) {
+                    mouse_pulse_btns |= (uint8_t)(b.code & 0x1FU);
+                    s_btn_tap_armed[i] = false;
+                }
+            } else if (now_pressed) {
                 mouse_btns |= (uint8_t)(b.code & 0x1FU);
             }
             break;
@@ -302,6 +318,12 @@ void usb_hid_process_wiimote(uint16_t buttons, uint16_t prev_buttons,
                 if (now_pressed && !prev_pressed) {
                     s_btn_down_ms[i] = now_ms;
                     s_btn_tap_armed[i] = true;
+                } else if (now_pressed && s_btn_tap_armed[i] &&
+                           (i == WIIMOTE_IDX_PLUS || i == WIIMOTE_IDX_MINUS)) {
+                    if ((now_ms - s_btn_down_ms[i]) >= SHORT_PRESS_MAX_MS) {
+                        cons_taps[cons_tap_count++] = HID_CONSUMER_MUTE;
+                        s_btn_tap_armed[i] = false;
+                    }
                 } else if (!now_pressed && prev_pressed && s_btn_tap_armed[i]) {
                     if ((now_ms - s_btn_down_ms[i]) < SHORT_PRESS_MAX_MS) {
                         cons_taps[cons_tap_count++] = b.code;
@@ -325,11 +347,14 @@ void usb_hid_process_wiimote(uint16_t buttons, uint16_t prev_buttons,
         s_last_scroll_ms = now_ms;
     }
 
-    if (mouse_btns != s_mouse_state.buttons ||
+    uint8_t effective_mouse_btns = (uint8_t)(mouse_btns | mouse_pulse_btns);
+    s_pending_mouse_release_btns = (uint8_t)(mouse_pulse_btns & (uint8_t)(~mouse_btns));
+
+    if (effective_mouse_btns != s_mouse_state.buttons ||
         abs_x != s_mouse_state.x ||
         abs_y != s_mouse_state.y ||
         s_pending_wheel != 0) {
-        s_mouse_state.buttons = mouse_btns;
+        s_mouse_state.buttons = effective_mouse_btns;
         s_mouse_state.x = abs_x;
         s_mouse_state.y = abs_y;
         s_mouse_dirty = true;
@@ -381,7 +406,13 @@ static void usb_hid_flush_reports(void) {
         if (tud_hid_report(REPORT_ID_ABS_MOUSE, &s_mouse_state, sizeof(s_mouse_state))) {
             s_pending_wheel = 0;
             s_mouse_state.wheel = 0;
-            s_mouse_dirty = false;
+            if (s_pending_mouse_release_btns != 0U) {
+                s_mouse_state.buttons &= (uint8_t)(~s_pending_mouse_release_btns);
+                s_pending_mouse_release_btns = 0U;
+                s_mouse_dirty = true;
+            } else {
+                s_mouse_dirty = false;
+            }
         }
     }
 #endif

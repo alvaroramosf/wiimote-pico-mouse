@@ -53,19 +53,19 @@ void flash_keymap_get_defaults(keymap_config_t *out) {
         ACTION_MOUSE_BTN, BINDING_FLAG_HOLD, HID_MOUSE_BTN_LEFT
     };
     out->bindings[WIIMOTE_IDX_A] = (button_binding_t){
-        ACTION_MOUSE_BTN, BINDING_FLAG_HOLD, HID_MOUSE_BTN_RIGHT
+        ACTION_MOUSE_BTN, BINDING_FLAG_SHORT_PRESS, HID_MOUSE_BTN_LEFT
     };
     out->bindings[WIIMOTE_IDX_ONE] = (button_binding_t){
-        ACTION_MOUSE_BTN, BINDING_FLAG_HOLD, HID_MOUSE_BTN_MIDDLE
-    };
-    out->bindings[WIIMOTE_IDX_TWO] = (button_binding_t){
-        ACTION_KEYBOARD_KEY, BINDING_FLAG_NONE, WIIMOTE_BTN_2_KEYCODE
-    };
-    out->bindings[WIIMOTE_IDX_UP] = (button_binding_t){
         ACTION_MOUSE_WHEEL, BINDING_FLAG_REPEAT, (uint16_t)(int16_t)(SCROLL_STEP_AMOUNT)
     };
-    out->bindings[WIIMOTE_IDX_DOWN] = (button_binding_t){
+    out->bindings[WIIMOTE_IDX_TWO] = (button_binding_t){
         ACTION_MOUSE_WHEEL, BINDING_FLAG_REPEAT, (uint16_t)(int16_t)(-SCROLL_STEP_AMOUNT)
+    };
+    out->bindings[WIIMOTE_IDX_UP] = (button_binding_t){
+        ACTION_NONE, BINDING_FLAG_NONE, 0U
+    };
+    out->bindings[WIIMOTE_IDX_DOWN] = (button_binding_t){
+        ACTION_NONE, BINDING_FLAG_NONE, 0U
     };
     out->bindings[WIIMOTE_IDX_LEFT] = (button_binding_t){
         ACTION_MOUSE_BTN, BINDING_FLAG_HOLD, HID_MOUSE_BTN_BACK
@@ -80,7 +80,7 @@ void flash_keymap_get_defaults(keymap_config_t *out) {
         ACTION_CONSUMER_MEDIA, BINDING_FLAG_SHORT_PRESS, HID_CONSUMER_VOLUME_DECREMENT
     };
     out->bindings[WIIMOTE_IDX_HOME] = (button_binding_t){
-        ACTION_CONSUMER_MEDIA, BINDING_FLAG_NONE, HID_CONSUMER_PLAY_PAUSE
+        ACTION_KEYBOARD_KEY, BINDING_FLAG_NONE, WIIMOTE_BTN_2_KEYCODE
     };
 
     out->min_cutoff = ONE_EURO_MIN_CUTOFF;

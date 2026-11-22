@@ -515,16 +515,16 @@
 
       const WIIMOTE_BUTTONS = [
         { idx: 0,  name: "B (Trigger)",  note: "Index trigger",            def: [ACTION_MOUSE_BTN, FLAG_HOLD, 0x01] },
-        { idx: 1,  name: "A",            note: "Also confirms calibration", def: [ACTION_MOUSE_BTN, FLAG_HOLD, 0x02] },
-        { idx: 2,  name: "1",            note: "",                         def: [ACTION_MOUSE_BTN, FLAG_HOLD, 0x04] },
-        { idx: 3,  name: "2",            note: "",                         def: [ACTION_KEYBOARD_KEY, FLAG_NONE, 0xE3] },
-        { idx: 4,  name: "D-Pad Up",     note: "",                         def: [ACTION_MOUSE_WHEEL, FLAG_REPEAT, 1] },
-        { idx: 5,  name: "D-Pad Down",   note: "",                         def: [ACTION_MOUSE_WHEEL, FLAG_REPEAT, -1] },
+        { idx: 1,  name: "A",            note: "Short=Left, 2s=Right, Calib", def: [ACTION_MOUSE_BTN, FLAG_SHORT_PRESS, 0x01] },
+        { idx: 2,  name: "1",            note: "",                         def: [ACTION_MOUSE_WHEEL, FLAG_REPEAT, 1] },
+        { idx: 3,  name: "2",            note: "",                         def: [ACTION_MOUSE_WHEEL, FLAG_REPEAT, -1] },
+        { idx: 4,  name: "D-Pad Up",     note: "",                         def: [ACTION_NONE, FLAG_NONE, 0x00] },
+        { idx: 5,  name: "D-Pad Down",   note: "",                         def: [ACTION_NONE, FLAG_NONE, 0x00] },
         { idx: 6,  name: "D-Pad Left",   note: "",                         def: [ACTION_MOUSE_BTN, FLAG_HOLD, 0x08] },
         { idx: 7,  name: "D-Pad Right",  note: "",                         def: [ACTION_MOUSE_BTN, FLAG_HOLD, 0x10] },
-        { idx: 8,  name: "+",            note: "Hold + & - 3s = Calib",    def: [ACTION_CONSUMER_MEDIA, FLAG_SHORT_PRESS, 0x00E9] },
-        { idx: 9,  name: "-",            note: "Hold + & - 3s = Calib",    def: [ACTION_CONSUMER_MEDIA, FLAG_SHORT_PRESS, 0x00EA] },
-        { idx: 10, name: "Home",         note: "",                         def: [ACTION_CONSUMER_MEDIA, FLAG_NONE, 0x00CD] }
+        { idx: 8,  name: "+",            note: "Short=Vol+, 1s=Mute, +&- 3s=Calib", def: [ACTION_CONSUMER_MEDIA, FLAG_SHORT_PRESS, 0x00E9] },
+        { idx: 9,  name: "-",            note: "Short=Vol-, 1s=Mute, +&- 3s=Calib", def: [ACTION_CONSUMER_MEDIA, FLAG_SHORT_PRESS, 0x00EA] },
+        { idx: 10, name: "Home",         note: "",                         def: [ACTION_KEYBOARD_KEY, FLAG_NONE, 0xE3] }
       ];
 
       const MOUSE_BTN_CODES = [
