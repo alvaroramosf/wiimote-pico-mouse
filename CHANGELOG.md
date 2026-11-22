@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/). The version lives in the [`VERSION`](VERSION) file.
 
+## [0.1.1-beta] - 2026-11-22
+
+### Fixed
+- Fixed inverted PixArt IR camera X/Y axes (`WIIMOTE_IR_INVERT_X=0`, `WIIMOTE_IR_INVERT_Y=1`) so pointer movement matches physical aiming on real hardware.
+- Rejected negative-delta 2-point calibrations and ignored invalid/negative calibration coefficients loaded from Flash.
+- Updated `docs/math_tracking.tex` coordinate-centering equations to match the corrected sensor axes.
+
+### Changed
+- Updated default button bindings: `A` short press = Left Click, `A` long press (2 s) = Right Click; `+`/`-` short press = Volume Up/Down, `+`/`-` long press (1 s, separately) = Mute/Unmute; `Home` = Super/GUI key; `1`/`2` = Scroll Up/Down; `D-Pad Up/Down` = unassigned.
+- Increased default `SCROLL_INTERVAL_MS` from `40 ms` to `120 ms` for smoother, slower scrolling.
+
 ## [0.1.0-beta] - 2026-11-20
 
 First public pre-release. Not yet validated on real hardware.
